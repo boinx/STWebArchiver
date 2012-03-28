@@ -24,16 +24,24 @@
 
 @implementation AppController
 
-- (void)archive:(id)sender {
-	NSURL *sourceUrl = [NSURL URLWithString:[sender stringValue]];
-	STWebArchiver *archiver = [[STWebArchiver alloc] init];
-	[archiver archiveHTMLData:[NSData dataWithContentsOfURL:sourceUrl]
-				 textEncoding:@"UTF-8"
-					  baseURL:sourceUrl
-              completionBlock:^(NSData *data) {
-                  [data writeToFile:@"/Users/shun/Desktop/SampleWebArchive.webarchive" atomically:YES];
-                  [archiver release];
-              }];
+- (void)archive:(id)sender 
+{
+	NSString *urlString = [sender stringValue];
+	if ([urlString length] > 0 && [urlString hasPrefix:@"file://"])
+	{
+		NSURL *sourceUrl = [NSURL URLWithString:urlString];
+		STWebArchiver *archiver = [[STWebArchiver alloc] init];
+		[archiver archiveHTMLData:[NSData dataWithContentsOfURL:sourceUrl]
+					 textEncoding:@"UTF-8"
+						  baseURL:sourceUrl
+				  completionBlock:^(NSData *data) 
+		 {
+			 NSString *homeDesktop = @"~/Desktop/SampleWebArchive.webarchive";
+			 homeDesktop = [homeDesktop stringByExpandingTildeInPath];
+			 [data writeToFile:homeDesktop atomically:YES];
+			 [archiver release];
+		 }];
+	}
 }
 
 @end
