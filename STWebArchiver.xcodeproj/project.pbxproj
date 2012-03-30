@@ -18,6 +18,7 @@
 		8D11072B0486CEB800E47090 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C165CFE840E0CC02AAC07 /* InfoPlist.strings */; };
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		E10538E31525F85200174610 /* STWebArchiver.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2458496313C350B80028A863 /* STWebArchiver.h */; };
 		E1A96BCB1522386000E15614 /* STWebArchiver.m in Sources */ = {isa = PBXBuildFile; fileRef = 2458496413C350B80028A863 /* STWebArchiver.m */; };
 		E1A96BCC1522387100E15614 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97325FDCFA39411CA2CEA /* Foundation.framework */; };
 		E1A96BCD1522389200E15614 /* libxml2.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2458495F13C34FC50028A863 /* libxml2.dylib */; };
@@ -41,6 +42,16 @@
 			dstSubfolderSpec = 10;
 			files = (
 				246BDEA013CD3616007FD3EE /* STWebArchiver.framework in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E10538E11525F82800174610 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Headers;
+			dstSubfolderSpec = 16;
+			files = (
+				E10538E31525F85200174610 /* STWebArchiver.h in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -237,6 +248,7 @@
 			buildPhases = (
 				E1A96BBB1522384600E15614 /* Sources */,
 				E1A96BBC1522384600E15614 /* Frameworks */,
+				E10538E11525F82800174610 /* CopyFiles */,
 			);
 			buildRules = (
 			);
