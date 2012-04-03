@@ -40,8 +40,8 @@
 				baseURL:(NSURL *)anURL
         completionBlock:(void (^)(NSData *))completion 
 {
-	dispatch_queue_t callingQueue = dispatch_get_current_queue();	// call completion block on the current	queue
-	dispatch_retain(callingQueue);
+	dispatch_queue_t completionQueue = dispatch_queue_create("completion", DISPATCH_QUEUE_CONCURRENT);	// don't call the completion black on the same thread as you call this method. Calling thread in locked by dispatch_semaphore_wait
+	dispatch_retain(completionQueue);
 	
 	void (^completionBlock) (NSData *inData);
 	completionBlock = [completion copy];	// copy completion block to heap
@@ -49,13 +49,13 @@
 	void (^completionBlockHandler) (NSData *inData) = nil;
 	completionBlockHandler = ^(NSData *inData) {
 		
-		dispatch_sync(callingQueue, ^(void)
+		dispatch_sync(completionQueue, ^(void)
 					  {
 						  completionBlock(inData);
 					  });
 		
 		[completionBlock release];
-		dispatch_release(callingQueue);
+		dispatch_release(completionQueue);
 	};
 		
 	if (aData)
