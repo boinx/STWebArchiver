@@ -38,69 +38,110 @@
 - (void)archiveHTMLData:(NSData *)aData
 		   textEncoding:(NSString *)anEncoding
 				baseURL:(NSURL *)anURL
-        completionBlock:(void (^)(NSData *))completion {
-	htmlDocPtr doc = htmlParseDoc((xmlChar *)[aData bytes], [anEncoding UTF8String]);
-	NSArray *pathsForImagesAndScripts = [self valueForAttributeName:@"src" withEvaluatingXPath:@"//script[@src]|//img[@src]" inDocument:doc];
-	NSArray *pathsForStylesheets = [self valueForAttributeName:@"href" withEvaluatingXPath:@"//link[@rel='stylesheet'][@href]" inDocument:doc];
-	NSArray *resourcesPaths = [pathsForImagesAndScripts arrayByAddingObjectsFromArray:pathsForStylesheets];
-	NSArray *resourceUrls = [self absoluteURLsForPaths:resourcesPaths baseURL:anURL];
-	dispatch_async(dispatch_queue_create("Downloads", 0), ^{
-		NSMutableDictionary *resources = [NSMutableDictionary dictionary];
-		dispatch_apply([resourceUrls count], dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(size_t i) {
-			NSURL *url = [resourceUrls objectAtIndex:i];
-			NSString *urlString = [url absoluteString];
-			BOOL unfetched = NO;
-			@synchronized (resources) {
-				unfetched = ![resources objectForKey:urlString];
-				if (unfetched) {
-					[resources setObject:[NSNull null] forKey:urlString];
+        completionBlock:(void (^)(NSData *))completion 
+{
+	dispatch_queue_t callingQueue = dispatch_get_current_queue();	// call completion block on the current	queue
+	dispatch_retain(callingQueue);
+	
+	void (^completionBlock) (NSData *inData);
+	completionBlock = [completion copy];	// copy completion block to heap
+	
+	void (^completionBlockHandler) (NSData *inData) = nil;
+	completionBlockHandler = ^(NSData *inData) {
+		
+		dispatch_sync(callingQueue, ^(void)
+					  {
+						  completionBlock(inData);
+					  });
+		
+		[completionBlock release];
+		dispatch_release(callingQueue);
+	};
+		
+	if (aData)
+	{
+		htmlDocPtr doc = htmlParseDoc((xmlChar *)[aData bytes], [anEncoding UTF8String]);
+		NSArray *pathsForImagesAndScripts = [self valueForAttributeName:@"src" withEvaluatingXPath:@"//script[@src]|//img[@src]" inDocument:doc];
+		NSArray *pathsForStylesheets = [self valueForAttributeName:@"href" withEvaluatingXPath:@"//link[@rel='stylesheet'][@href]" inDocument:doc];
+		NSArray *resourcesPaths = [pathsForImagesAndScripts arrayByAddingObjectsFromArray:pathsForStylesheets];
+		NSArray *resourceUrls = [self absoluteURLsForPaths:resourcesPaths baseURL:anURL];
+		
+		dispatch_queue_t downloadQueue = dispatch_queue_create("Downloads", 0);
+		dispatch_async(downloadQueue, ^{
+			NSMutableDictionary *resources = [NSMutableDictionary dictionary];
+			dispatch_apply([resourceUrls count], dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(size_t i) {
+				NSURL *url = [resourceUrls objectAtIndex:i];
+				NSString *urlString = [url absoluteString];
+				BOOL unfetched = NO;
+				
+				@synchronized (resources) 
+				{
+					unfetched = ![resources objectForKey:urlString];
+					if (unfetched) 
+					{
+						[resources setObject:[NSNull null] forKey:urlString];
+					}
 				}
-			}
-			if (unfetched) {
-				NSURLResponse *response;
-				NSError *error;
-				NSURLRequest *request = [NSURLRequest requestWithURL:url];
-				NSData *data = [NSURLConnection sendSynchronousRequest:request
-													 returningResponse:&response
-																 error:&error];
-				NSMutableDictionary *resourceArchive = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-														urlString, @"WebResourceURL",
-														[response MIMEType], @"WebResourceMIMEType",
-														data, @"WebResourceData", nil];
-				if ([response textEncodingName]) {
-					[resourceArchive setObject:[response textEncodingName] forKey:@"WebResourceTextEncodingName"];
+				
+				if (unfetched) 
+				{
+					NSURLResponse *response;
+					NSError *error;
+					NSURLRequest *request = [NSURLRequest requestWithURL:url];
+					NSData *data = [NSURLConnection sendSynchronousRequest:request
+														 returningResponse:&response
+																	 error:&error];
+					NSMutableDictionary *resourceArchive = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+															urlString, @"WebResourceURL",
+															[response MIMEType], @"WebResourceMIMEType",
+															data, @"WebResourceData", nil];
+					if ([response textEncodingName]) 
+					{
+						[resourceArchive setObject:[response textEncodingName] forKey:@"WebResourceTextEncodingName"];
+					}
+					
+					@synchronized (resources) 
+					{
+						[resources setObject:resourceArchive forKey:urlString];
+					}
 				}
-				@synchronized (resources) {
-					[resources setObject:resourceArchive forKey:urlString];
-				}
-			}
+			});
+			NSMutableDictionary *archiveSource = [NSMutableDictionary dictionaryWithObject:[resources allValues] forKey:@"WebSubresources"];
+			NSMutableDictionary *mainResource = [NSMutableDictionary dictionary];
+			[mainResource setObject:aData forKey:@"WebResourceData"];
+			[mainResource setObject:@"" forKey:@"WebResourceFrameName"];
+			[mainResource setObject:@"text/html" forKey:@"WebResourceMIMEType"];
+			[mainResource setObject:anEncoding forKey:@"WebResourceTextEncodingName"];
+			[mainResource setObject:[anURL absoluteString] forKey:@"WebResourceURL"];
+			[archiveSource setObject:mainResource forKey:@"WebMainResource"];
+			NSData *webArchive = [NSPropertyListSerialization dataFromPropertyList:archiveSource
+																			format:NSPropertyListBinaryFormat_v1_0
+																  errorDescription:NULL];
+			completionBlockHandler(webArchive);
 		});
-		NSMutableDictionary *archiveSource = [NSMutableDictionary dictionaryWithObject:[resources allValues] forKey:@"WebSubresources"];
-		NSMutableDictionary *mainResource = [NSMutableDictionary dictionary];
-		[mainResource setObject:aData forKey:@"WebResourceData"];
-		[mainResource setObject:@"" forKey:@"WebResourceFrameName"];
-		[mainResource setObject:@"text/html" forKey:@"WebResourceMIMEType"];
-		[mainResource setObject:anEncoding forKey:@"WebResourceTextEncodingName"];
-		[mainResource setObject:[anURL absoluteString] forKey:@"WebResourceURL"];
-		[archiveSource setObject:mainResource forKey:@"WebMainResource"];
-		NSData *webArchive = [NSPropertyListSerialization dataFromPropertyList:archiveSource
-                                                                        format:NSPropertyListBinaryFormat_v1_0
-                                                              errorDescription:NULL];
-        completion(webArchive);
-	});
-	xmlFreeDoc(doc);
+		
+		xmlFreeDoc(doc);
+	}
+	else 
+	{
+		completionBlockHandler(nil);
+	}
 }
 
 - (NSArray *)valueForAttributeName:(NSString *)attributeName
 			   withEvaluatingXPath:(NSString *)xpathExpression
-						inDocument:(xmlDocPtr)document {
+						inDocument:(xmlDocPtr)document 
+{
 	xmlXPathContextPtr context = xmlXPathNewContext(document);
 	xmlXPathObjectPtr xpathObject = xmlXPathEvalExpression((xmlChar *)[xpathExpression UTF8String], context);
 	xmlNodeSetPtr nodes = xpathObject->nodesetval;
 	NSMutableArray *results = nil;
-	if (!xmlXPathNodeSetIsEmpty(nodes)) {
+
+	if (!xmlXPathNodeSetIsEmpty(nodes)) 
+	{
 		results = [NSMutableArray arrayWithCapacity:nodes->nodeNr];
-		for (int i = 0; i < nodes->nodeNr; i++) {
+		for (int i = 0; i < nodes->nodeNr; i++) 
+		{
 			xmlNodePtr node = nodes->nodeTab[i];
 			char *attributeChars = (char *)xmlGetProp(node, (xmlChar *)[attributeName UTF8String]);
 			NSString *attributeString = [NSString stringWithUTF8String:attributeChars];
@@ -108,16 +149,30 @@
 			[results addObject:attributeString];
 		}
 	}
+
 	xmlXPathFreeObject(xpathObject);
 	xmlXPathFreeContext(context);
 	return results;
 }
 
-- (NSArray *)absoluteURLsForPaths:(NSArray *)paths baseURL:(NSURL *)base {
-	NSMutableArray *results = [NSMutableArray arrayWithCapacity:[paths count]];
-	for (NSString *path in paths) {
-		[results addObject:[NSURL URLWithString:path relativeToURL:base]];
+- (NSArray *)absoluteURLsForPaths:(NSArray *)paths baseURL:(NSURL *)base 
+{
+	NSArray *results = nil;;
+
+	if (base)
+	{
+		NSMutableArray *resultPaths = [NSMutableArray arrayWithCapacity:[paths count]];
+		for (NSString *path in paths) 
+		{
+			[resultPaths addObject:[NSURL URLWithString:path relativeToURL:base]];
+		}
+		results = [[resultPaths copy] autorelease];	// make immutable
 	}
+	else
+	{
+		results = paths;	// all paths are absolut
+	}
+	
 	return results;
 }
 
