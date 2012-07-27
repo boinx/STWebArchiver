@@ -67,7 +67,7 @@
 		NSArray *resourceUrls = [self absoluteURLsForPaths:resourcesPaths baseURL:anURL];
 		
 		dispatch_queue_t downloadQueue = dispatch_queue_create("Downloads", DISPATCH_QUEUE_CONCURRENT);
-		dispatch_async(downloadQueue, ^{
+		dispatch_sync(downloadQueue, ^{
 			NSMutableDictionary *resources = [NSMutableDictionary dictionary];
 			dispatch_apply([resourceUrls count], dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(size_t i) {
 				NSURL *url = [resourceUrls objectAtIndex:i];
