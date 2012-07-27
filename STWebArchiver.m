@@ -44,7 +44,7 @@
 	NSArray *pathsForStylesheets = [self valueForAttributeName:@"href" withEvaluatingXPath:@"//link[@rel='stylesheet'][@href]" inDocument:doc];
 	NSArray *resourcesPaths = [pathsForImagesAndScripts arrayByAddingObjectsFromArray:pathsForStylesheets];
 	NSArray *resourceUrls = [self absoluteURLsForPaths:resourcesPaths baseURL:anURL];
-	dispatch_sync(dispatch_queue_create("Downloads", 0), ^{
+	dispatch_async(dispatch_queue_create("Downloads", 0), ^{
 		NSMutableDictionary *resources = [NSMutableDictionary dictionary];
 		dispatch_apply([resourceUrls count], dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(size_t i) {
 			NSURL *url = [resourceUrls objectAtIndex:i];
